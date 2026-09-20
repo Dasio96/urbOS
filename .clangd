@@ -1,0 +1,8 @@
+
+CompileFlags:
+  Add: [--target=riscv32-unknown-elf, -march=rv32imac_zicsr, -mabi=ilp32, -ffreestanding, -I../include]
+---
+If:
+  PathMatch: .*\.S
+Diagnostics:
+  Suppress: "*"
