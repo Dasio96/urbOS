@@ -1,4 +1,3 @@
-/* Układ pamięci jądra. OpenSBI ładuje jądro pod 0x80200000. */
 ENTRY(_start)
 
 SECTIONS {
@@ -15,6 +14,9 @@ SECTIONS {
   }
 
   . = ALIGN(16);
-  . += 64 * 1024;               /* 64 KiB stosu jądra */
+  . += 64 * 1024;
   __stack_top = .;
+
+  . = ALIGN(4096);
+  PROVIDE(_end = .);
 }
