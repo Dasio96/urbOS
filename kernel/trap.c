@@ -1,5 +1,6 @@
 #include "trap.h"
 #include "stdio.h"
+#include "timer.h"
 #include "types.h"
 
 extern void trap_entry(void);
@@ -25,9 +26,13 @@ void handle_trap(struct trap_frame *tf) {
   u32 is_interrupt = (tf->scause & 0x80000000) != 0;
   u32 code = tf->scause & 0x7fffffff;
 
-  if (is_interrupt)
-    printf("[TRAP] interrupt code %d\n", code);
-  else {
+  if (is_interrupt) {
+    if (code == 5) {
+      timer_handler();
+    } else {
+      printf("[TRAP] unknown interrupt code: %d\n", code);
+    }
+  } else {
     printf("\n[TRAP] %d at sepc = 0x%x stval = 0x%x\n", code, tf->sepc,
            tf->stval);
     dump_registers(tf);

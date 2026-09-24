@@ -1,14 +1,15 @@
 #include "stdio.h"
+#include "timer.h"
 #include "trap.h"
 
 void kmain(void) {
   printf("initializng traps \n");
   trap_init();
 
-  printf("ebreak trap");
-  __asm__ __volatile__("ebreak");
+  printf("initializng timer \n");
+  timer_init();
 
-  printf("successfully resumed execution after trap\n");
+  printf("system ready");
 
   while (1) {
     __asm__ __volatile__("wfi");
