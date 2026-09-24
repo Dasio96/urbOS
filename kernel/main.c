@@ -1,10 +1,16 @@
-#include "sbi.h"
 #include "stdio.h"
+#include "trap.h"
 
 void kmain(void) {
-  sbi_puts("URBAN!\n");
-  printf("ohio");
+  printf("initializng traps \n");
+  trap_init();
 
-  for (;;)
-    __asm__ volatile("wfi");
+  printf("ebreak trap");
+  __asm__ __volatile__("ebreak");
+
+  printf("successfully resumed execution after trap\n");
+
+  while (1) {
+    __asm__ __volatile__("wfi");
+  }
 }
