@@ -10,14 +10,18 @@ void trap_init(void) {
 }
 
 static void dump_registers(struct trap_frame *tf) {
-  printf("  ra: 0x%x   sp: 0x%x   gp: 0x%x   tp: 0x%x\n", tf->ra, tf->sp,
-         tf->gp, tf->tp);
-  printf("  t0: 0x%x   t1: 0x%x   t2: 0x%x   s0: 0x%x\n", tf->t0, tf->t1,
-         tf->t2, tf->s0);
-  printf("  a0: 0x%x   a1: 0x%x   a2: 0x%x   a3: 0x%x\n", tf->a0, tf->a1,
-         tf->a2, tf->a3);
-  printf("  a4: 0x%x   a5: 0x%x   a6: 0x%x   a7: 0x%x\n", tf->a4, tf->a5,
-         tf->a6, tf->a7);
+  printf("  ra: 0x%x   sp: 0x%x   gp: 0x%x   tp: 0x%x\n", tf->regs[0],
+         tf->regs[1], tf->regs[2], tf->regs[3]);
+
+  printf("  t0: 0x%x   t1: 0x%x   t2: 0x%x   s0: 0x%x\n", tf->regs[4],
+         tf->regs[5], tf->regs[6], tf->regs[7]);
+
+  printf("  a0: 0x%x   a1: 0x%x   a2: 0x%x   a3: 0x%x\n", tf->regs[9],
+         tf->regs[10], tf->regs[11], tf->regs[12]);
+
+  printf("  a4: 0x%x   a5: 0x%x   a6: 0x%x   a7: 0x%x\n", tf->regs[13],
+         tf->regs[14], tf->regs[15], tf->regs[16]);
+
   printf("  sepc: 0x%x   stval: 0x%x   scause: 0x%x\n", tf->sepc, tf->stval,
          tf->scause);
 }
