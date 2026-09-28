@@ -47,3 +47,22 @@ void kvm_init(void) {
 
   printf("kernel vm: paging enabled successfully\n");
 }
+
+pde_t create_user_page_table(u32 user_code_va, u32 user_code_pa, u32 code_size,
+                             u32 user_stack_pa) {
+  pde_t user_root = (pde_t)alloc_page();
+
+  for (int i = 0; i < 1024; i++) {
+    user_root[i] = root_page_table[i];
+  }
+
+  for (u32 offset = 0; offset < code_size; offset += PAGE_SIZE) {
+    map_page(user_root, user_code_va + offset, user_code_pa + offset,
+             PTE_U | PTE_R | PTE_X | PTE_W);
+  }
+
+  u32 user_stack_va = 0x70000000;
+  map_page(user_root, user_stack_va, user_stack_pa, PTE_U | PTE_R | PTE_W);
+
+  return user_root;
+}
