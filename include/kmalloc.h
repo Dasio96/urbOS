@@ -6,5 +6,6 @@
 void kmalloc_init(void);
 void *kmalloc(u32 size);
 void kfree(void *ptr);
+void kmalloc_test(void);
 
-#endif // KMALLOC_H
+#endif // !KMALLOC_H
