@@ -5,11 +5,13 @@ SECTIONS {
 
   .text   : { *(.text.boot) *(.text .text.*) }
   .rodata : ALIGN(4) { *(.rodata .rodata.*) }
-  .data   : ALIGN(4) { *(.data .data.*) }
+  .data   : ALIGN(4) { *(.data .data.*) *(.sdata .sdata.*) }
 
   .bss : ALIGN(4) {
     __bss_start = .;
     *(.bss .bss.* COMMON)
+    *(.sbss .sbss.*)
+    . = ALIGN(4);
     __bss_end = .;
   }
 

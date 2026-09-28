@@ -5,9 +5,9 @@ QEMU  ?= qemu-system-riscv32
 
 #   make run BIOS=/usr/lib/riscv32-linux-gnu/opensbi/generic/fw_dynamic.bin
 BIOS  ?= default
-
 CFLAGS  = -march=rv32imac_zicsr -mabi=ilp32 -std=c11 -O2 -g \
           -Wall -Wextra -ffreestanding -fno-stack-protector -nostdlib \
+          -mno-relax -fno-tree-loop-distribute-patterns \
           -MMD -MP -Iinclude
 LDFLAGS = -T kernel/kernel.ld -nostdlib -Wl,-Map=build/kernel.map
 
