@@ -1,19 +1,33 @@
 #include "page.h"
+#include "memlayout.h"
 #include "stdio.h"
+#include "string.h"
 
 extern char _end[];
-
-#define RAM_END 0x88000000
 
 struct page {
   struct page *next;
 };
 
 static struct page *free_list = NULL;
+static u32 ram_start;
+static u32 ram_end;
 
 void free_page(void *p) {
   if (!p)
     return;
+
+  u32 addr = (u32)p;
+
+  if (addr < ram_start || addr >= ram_end)
+    panic("free_page: out of bounds address");
+
+  if (addr & (PAGE_SIZE - 1))
+    panic("free_page: unaligned address");
+
+  if (free_list == (struct page *)p) {
+    panic("free_page: double free detected");
+  }
 
   struct page *page = (struct page *)p;
   page->next = free_list;
@@ -21,14 +35,15 @@ void free_page(void *p) {
 }
 
 void page_init(void) {
-  u32 start = (u32)_end;
-  u32 end = RAM_END;
+  ram_start = (u32)_end;
+  ram_end = RAM_END;
 
-  start = (start + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+  ram_start = (ram_start + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 
-  printf("Page allocator: initializing from 0x%x to 0x%x\n", start, end);
+  printf("page allocator: initializing from 0x%x to 0x%x\n", ram_start,
+         ram_end);
 
-  for (u32 p = start; p + PAGE_SIZE <= end; p += PAGE_SIZE) {
+  for (u32 p = ram_end - PAGE_SIZE; p >= ram_start; p -= PAGE_SIZE) {
     free_page((void *)p);
   }
 }
@@ -40,10 +55,7 @@ void *alloc_page(void) {
   struct page *p = free_list;
   free_list = free_list->next;
 
-  u8 *ptr = (u8 *)p;
-  for (int i = 0; i < PAGE_SIZE - 1; i++) {
-    ptr[i] = 0;
-  }
+  memset(p, 0, PAGE_SIZE);
 
   return (void *)p;
 }
