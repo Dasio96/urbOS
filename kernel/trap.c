@@ -1,4 +1,5 @@
 #include "trap.h"
+#include "proc.h"
 #include "stdio.h"
 #include "timer.h"
 #include "types.h"
@@ -34,27 +35,49 @@ void handle_trap(struct trap_frame *tf) {
     if (code == 5) {
       timer_handler();
     } else {
-      printf("[TRAP] unknown interrupt code %d\n", code);
+      printf("[TRAP] unknown interrupt code: %d\n", code);
     }
   } else {
     if (code == 8) {
       u32 syscall_id = tf->regs[16];
+      struct task *t = get_current_task();
+
       if (syscall_id == 1) {
         char c = (char)tf->regs[9];
         printf("%c", c);
+        tf->sepc += 4;
+
       } else if (syscall_id == 2) {
         register long a0 __asm__("a0");
         register long a7 __asm__("a7") = 2;
         __asm__ volatile("ecall" : "=r"(a0) : "r"(a7) : "memory");
         tf->regs[9] = a0;
+        tf->sepc += 4;
+
       } else if (syscall_id == 3) {
         const char *s = (const char *)tf->regs[9];
         printf("%s", s);
+        tf->sepc += 4;
+
+      } else if (syscall_id == 4) {
+        tf->sepc += 4;
+        if (t)
+          t->tf = *tf;
+        yield();
+        return;
+
+      } else if (syscall_id == 5) {
+        int status = (int)tf->regs[9];
+        exit_task(status);
+        return;
+
       } else {
-        printf("[TRAP] unknown syscall id %d\n", syscall_id);
+        printf("[TRAP] unknown syscall id: %d\n", syscall_id);
+        tf->sepc += 4;
       }
 
-      tf->sepc += 4;
+      if (t)
+        t->tf = *tf;
       return;
     }
 
@@ -70,6 +93,6 @@ void handle_trap(struct trap_frame *tf) {
     printf("\n[TRAP] %d at sepc = 0x%x stval = 0x%x\n", code, tf->sepc,
            tf->stval);
     dump_registers(tf);
-    panic("unhandled kernel exception");
+    panic("Unhandled kernel exception!");
   }
 }

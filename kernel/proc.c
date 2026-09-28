@@ -4,27 +4,23 @@
 #include "trap.h"
 #include "vm.h"
 
-extern void cpu_switch_to(struct context *old, struct context *next);
-extern void trap_return(struct trap_frame *tf);
-
 static struct task tasks[MAX_TASKS];
-static struct task *current_task = NULL;
-static int current_pid = 0;
-static struct task main_task;
+static struct task *current_task = 0;
+static u32 next_pid = 1;
 
 void proc_init(void) {
   for (int i = 0; i < MAX_TASKS; i++) {
-    tasks[i].state = TASK_UNUSED;
     tasks[i].pid = 0;
+    tasks[i].state = TASK_UNUSED;
   }
-
-  main_task.state = TASK_RUNNING;
-  main_task.pid = 0;
-  current_task = &main_task;
+  printf("process manager: initialized %d tasks\n", MAX_TASKS);
 }
 
+struct task *get_current_task(void) { return current_task; }
+
 int task_create(void (*entry)(void)) {
-  struct task *t = NULL;
+  struct task *t = 0;
+
   for (int i = 0; i < MAX_TASKS; i++) {
     if (tasks[i].state == TASK_UNUSED) {
       t = &tasks[i];
@@ -33,26 +29,51 @@ int task_create(void (*entry)(void)) {
   }
 
   if (!t) {
-    printf("task_create: no free tasks slots\n");
+    printf("task_create: no free task slots\n");
     return -1;
   }
 
-  t->pid = ++current_pid;
+  void *user_code_pa = alloc_page();
+  void *user_stack_pa = alloc_page();
+
+  u8 *src = (u8 *)entry;
+  u8 *dst = (u8 *)user_code_pa;
+  for (int i = 0; i < PAGE_SIZE; i++) {
+    dst[i] = src[i];
+  }
+
+  u32 user_code_va = 0x00000000;
+
+  t->page_table = create_user_page_table(user_code_va, (u32)user_code_pa,
+                                         PAGE_SIZE, (u32)user_stack_pa);
+  t->pid = next_pid++;
+
+  __builtin_memset(&t->tf, 0, sizeof(t->tf));
+  t->tf.sepc = user_code_va;
+  t->tf.regs[1] = 0x70000000 + PAGE_SIZE;
+  u32 sstatus;
+  __asm__ __volatile__("csrr %0, sstatus" : "=r"(sstatus));
+  sstatus &= ~(1 << 8);
+  sstatus |= (1 << 5);
+  sstatus &= ~(1 << 1);
+  sstatus |= (1 << 18);
+  t->tf.sstatus = sstatus;
+
   t->state = TASK_RUNNABLE;
-
-  t->context.ra = (u32)entry;
-  t->context.sp = (u32)&t->stack[STACK_SIZE];
-
-  printf("process manager: created task pid %d\n", t->pid);
+  printf("task_create: created pid %d\n", t->pid);
   return t->pid;
 }
 
 void schedule(void) {
-  struct task *old = current_task;
-  struct task *next = NULL;
+  int start_idx = 0;
+  if (current_task) {
+    start_idx = (int)(current_task - tasks) + 1;
+    if (current_task->state == TASK_RUNNING) {
+      current_task->state = TASK_RUNNABLE;
+    }
+  }
 
-  int start_idx = (old == &main_task) ? 0 : (old - tasks + 1);
-
+  struct task *next = 0;
   for (int i = 0; i < MAX_TASKS; i++) {
     int idx = (start_idx + i) % MAX_TASKS;
     if (tasks[idx].state == TASK_RUNNABLE) {
@@ -61,58 +82,41 @@ void schedule(void) {
     }
   }
 
-  if (!next || next == old)
-    return;
+  if (!next) {
+    if (current_task && current_task->state == TASK_RUNNING) {
+      next = current_task;
+    } else {
+      printf("\n[SCHEDULER] all tasks finished\n");
+      current_task = 0;
 
-  if (old->state == TASK_RUNNING)
-    old->state = TASK_RUNNABLE;
+      __asm__ __volatile__("csrrs zero, sstatus, %0" : : "r"(1 << 1));
 
-  next->state = TASK_RUNNING;
-  current_task = next;
-
-  cpu_switch_to(&old->context, &next->context);
-}
-
-void yield(void) { schedule(); }
-void run_user_process(void (*user_code)(void)) {
-  void *user_stack_pa = alloc_page();
-  void *user_code_pa = alloc_page();
-
-  u8 *src = (u8 *)user_code;
-  u8 *dst = (u8 *)user_code_pa;
-  for (int i = 0; i < PAGE_SIZE; i++) {
-    dst[i] = src[i];
+      while (1) {
+        __asm__ __volatile__("wfi");
+      }
+    }
   }
 
-  u32 user_code_va = 0x00000000;
+  current_task = next;
+  current_task->state = TASK_RUNNING;
 
-  pde_t user_pt = create_user_page_table(user_code_va, (u32)user_code_pa,
-                                         PAGE_SIZE, (u32)user_stack_pa);
-
-  u32 satp_val = SATP_MODE_SV32 | (((u32)user_pt) >> 12);
+  u32 satp_val = SATP_MODE_SV32 | (((u32)current_task->page_table) >> 12);
   __asm__ __volatile__("csrw satp, %0\n"
                        "sfence.vma\n"
                        :
                        : "r"(satp_val)
                        : "memory");
 
-  struct trap_frame tf;
-  __builtin_memset(&tf, 0, sizeof(tf));
+  trap_return(&current_task->tf);
+}
 
-  tf.sepc = user_code_va;
-  tf.regs[1] = 0x70000000 + PAGE_SIZE;
-  u32 sstatus;
-  __asm__ __volatile__("csrr %0, sstatus" : "=r"(sstatus));
-  sstatus &= ~(1 << 8);
-  sstatus |= (1 << 5);
-  sstatus &= ~(1 << 1);
-  sstatus |= (1 << 18);
-  tf.sstatus = sstatus;
+void yield(void) { schedule(); }
 
-  printf("kernel: switching to user mode at sepc=0x%x, sp=0x%x...\n\n", tf.sepc,
-         tf.regs[1]);
-
-  __asm__ __volatile__("csrc sstatus, %0" : : "r"(1 << 1));
-
-  trap_return(&tf);
+void exit_task(int status) {
+  if (current_task) {
+    printf("\n[PROC] pid %d exited with status %d\n", current_task->pid,
+           status);
+    current_task->state = TASK_ZOMBIE;
+  }
+  schedule();
 }

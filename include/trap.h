@@ -56,6 +56,7 @@ struct trap_frame {
 
 void trap_init(void);
 void handle_trap(struct trap_frame *tf);
+void trap_return(struct trap_frame *tf);
 
 #endif // !__ASSEMBLER__
 

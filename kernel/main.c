@@ -25,6 +25,34 @@ void uputs(const char *s) {
   __asm__ __volatile__("ecall" : "+r"(a0) : "r"(a7) : "memory");
 }
 
+void uyield(void) {
+  register long a7 __asm__("a7") = 4;
+  __asm__ __volatile__("ecall" : : "r"(a7) : "memory");
+}
+
+void uexit(int status) {
+  register long a0 __asm__("a0") = status;
+  register long a7 __asm__("a7") = 5;
+  __asm__ __volatile__("ecall" : : "r"(a0), "r"(a7) : "memory");
+}
+
+void process1(void) {
+  for (int i = 0; i < 3; i++) {
+    uputs("[Process 1] running\n");
+    uyield();
+  }
+  uputs("[Process 1] exiting\n");
+  uexit(0);
+}
+
+void process2(void) {
+  for (int i = 0; i < 3; i++) {
+    uputs("  [Process 2] pid2\n");
+    uyield();
+  }
+  uputs("  [Process 2] exiting\n");
+  uexit(0);
+}
 static void print_prompt(void) { uputs("\nurbOS shell> "); }
 
 static void print_help(void) {
@@ -120,9 +148,12 @@ void kmain(void) {
   printf("initializng processes \n");
   proc_init();
 
-  printf("launching user process \n");
-  run_user_process(user_program);
+  printf("creating user tasks \n");
+  task_create(process1);
+  task_create(process2);
 
+  printf("statrting scheduler \n\n");
+  schedule();
   while (1) {
     yield();
   }
