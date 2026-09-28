@@ -74,14 +74,13 @@ void schedule(void) {
 }
 
 void yield(void) { schedule(); }
-
 void run_user_process(void (*user_code)(void)) {
   void *user_stack_pa = alloc_page();
   void *user_code_pa = alloc_page();
 
   u8 *src = (u8 *)user_code;
   u8 *dst = (u8 *)user_code_pa;
-  for (int i = 0; i < 256; i++) {
+  for (int i = 0; i < PAGE_SIZE; i++) {
     dst[i] = src[i];
   }
 
@@ -110,7 +109,7 @@ void run_user_process(void (*user_code)(void)) {
   sstatus |= (1 << 18);
   tf.sstatus = sstatus;
 
-  printf("kernel: switching to user mode at sepc=0x%x, sp=0x%x...\n", tf.sepc,
+  printf("kernel: switching to user mode at sepc=0x%x, sp=0x%x...\n\n", tf.sepc,
          tf.regs[1]);
 
   __asm__ __volatile__("csrc sstatus, %0" : : "r"(1 << 1));

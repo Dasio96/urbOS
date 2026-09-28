@@ -39,7 +39,6 @@ void handle_trap(struct trap_frame *tf) {
   } else {
     if (code == 8) {
       u32 syscall_id = tf->regs[16];
-
       if (syscall_id == 1) {
         char c = (char)tf->regs[9];
         printf("%c", c);
@@ -48,6 +47,9 @@ void handle_trap(struct trap_frame *tf) {
         register long a7 __asm__("a7") = 2;
         __asm__ volatile("ecall" : "=r"(a0) : "r"(a7) : "memory");
         tf->regs[9] = a0;
+      } else if (syscall_id == 3) {
+        const char *s = (const char *)tf->regs[9];
+        printf("%s", s);
       } else {
         printf("[TRAP] unknown syscall id %d\n", syscall_id);
       }

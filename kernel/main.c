@@ -20,38 +20,82 @@ int ugetchar(void) {
 }
 
 void uputs(const char *s) {
-  while (*s) {
-    uputchar(*s++);
+  register long a0 __asm__("a0") = (long)s;
+  register long a7 __asm__("a7") = 3;
+  __asm__ __volatile__("ecall" : "+r"(a0) : "r"(a7) : "memory");
+}
+
+static void print_prompt(void) { uputs("\nurbOS shell> "); }
+
+static void print_help(void) {
+  uputs("\navailable commands:\n");
+  uputs("  help  - displays this list\n");
+  uputs("  ping  - responds with pong\n");
+  uputs("  clear - clears the terminal\n");
+  uputs("  echo  - prints the provided text\n");
+}
+
+static void execute_command(char *buf, int len) {
+  if (len == 0)
+    return;
+
+  if (len == 4 && buf[0] == 'h' && buf[1] == 'e' && buf[2] == 'l' &&
+      buf[3] == 'p') {
+    print_help();
+  } else if (len == 4 && buf[0] == 'p' && buf[1] == 'i' && buf[2] == 'n' &&
+             buf[3] == 'g') {
+    uputs("\npong\n");
+  } else if (len == 5 && buf[0] == 'c' && buf[1] == 'l' && buf[2] == 'e' &&
+             buf[3] == 'a' && buf[4] == 'r') {
+    uputchar('\033');
+    uputchar('[');
+    uputchar('2');
+    uputchar('J');
+    uputchar('\033');
+    uputchar('[');
+    uputchar('H');
+  } else if (len >= 4 && buf[0] == 'e' && buf[1] == 'c' && buf[2] == 'h' &&
+             buf[3] == 'o') {
+    uputchar('\n');
+    if (len > 5 && buf[4] == ' ') {
+      uputs(&buf[5]);
+    }
+    uputchar('\n');
+  } else {
+    uputs("\nunknown command type help\n");
   }
 }
 
 void user_program(void) {
-  char prompt[16];
+  char buf[64];
+  int len = 0;
 
-  prompt[0] = '\n';
-  prompt[1] = 'u';
-  prompt[2] = 'r';
-  prompt[3] = 'b';
-  prompt[4] = 'O';
-  prompt[5] = 'S';
-  prompt[6] = ' ';
-  prompt[7] = 's';
-  prompt[8] = 'h';
-  prompt[9] = 'e';
-  prompt[10] = 'l';
-  prompt[11] = 'l';
-  prompt[12] = '>';
-  prompt[13] = ' ';
-  prompt[14] = '\0';
-
-  uputs(prompt);
+  uputs("urbOS shell\n");
+  print_prompt();
 
   while (1) {
     int ch = ugetchar();
-    if (ch != -1 && ch != 0) {
-      uputchar((char)ch);
-      if ((char)ch == '\r' || (char)ch == '\n') {
-        uputs(prompt);
+
+    if (ch == -1 || ch == 0) {
+      continue;
+    }
+
+    if (ch == '\r' || ch == '\n') {
+      buf[len] = '\0';
+      execute_command(buf, len);
+      len = 0;
+      print_prompt();
+    } else if (ch == 8 || ch == 127) {
+      if (len > 0) {
+        len--;
+        uputchar('\b');
+        uputchar(' ');
+        uputchar('\b');
+      }
+    } else if (ch >= 32 && ch <= 126) {
+      if (len < 63) {
+        buf[len++] = (char)ch;
+        uputchar((char)ch);
       }
     }
   }
