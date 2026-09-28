@@ -18,5 +18,7 @@ typedef u32 pte_t;
 typedef u32 *pde_t;
 
 void kvm_init(void);
+pde_t create_user_page_table(u32 user_code_va, u32 user_code_pa, u32 code_size,
+                             u32 user_stack_pa);
 
-#endif // !VM_H
+#endif
