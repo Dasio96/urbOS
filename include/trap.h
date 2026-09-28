@@ -54,6 +54,9 @@ struct trap_frame {
   u32 scause;
 };
 
+_Static_assert(sizeof(struct trap_frame) <= TF_SIZE,
+               "trap_frame size exceeds TF_SIZE");
+
 void trap_init(void);
 void handle_trap(struct trap_frame *tf);
 void trap_return(struct trap_frame *tf);
